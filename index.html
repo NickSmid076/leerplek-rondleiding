@@ -1,0 +1,525 @@
+<!doctype html><html lang="nl"><head><meta name="description" content="Interactieve 3D-rondleiding door Leerplek Breda – loop rond en klik op de i voor info per zone."><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Leerplek Breda Rondleiding</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Source+Sans+3:wght@400;500;600&display=swap">
+<style>
+/* Layout: full-bleed 3D walk view; floating chrome in the corners (title + zone, minimap, controls, info card). */
+:root{
+  --bg:#E9EDE6; --surface:rgba(251,252,249,.92); --surface-solid:#FBFCF9; --ink:#16241B; --ink-2:#43554A; --ink-3:#6E8073;
+  --line:rgba(22,36,27,.12); --green:#1E6B45; --amber:#C77E1E; --clay:#B4472F; --water:#256074; --plum:#6A4C7D;
+  --shadow:0 6px 24px rgba(22,36,27,.14);
+  --f-disp:"Bricolage Grotesque",system-ui,sans-serif; --f-body:"Source Sans 3",system-ui,-apple-system,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0E1512; --surface:rgba(21,30,24,.9); --surface-solid:#151E18; --ink:#E7EEE7; --ink-2:#AEBEB2; --ink-3:#86978C;
+  --line:rgba(231,238,231,.14); --green:#5CB384; --amber:#E0A44E; --clay:#E08063; --water:#6FA5B8; --plum:#B596C8;
+  --shadow:0 6px 24px rgba(0,0,0,.4); color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#0E1512; --surface:rgba(21,30,24,.9); --surface-solid:#151E18; --ink:#E7EEE7; --ink-2:#AEBEB2; --ink-3:#86978C;
+  --line:rgba(231,238,231,.14); --green:#5CB384; --amber:#E0A44E; --clay:#E08063; --water:#6FA5B8; --plum:#B596C8;
+  --shadow:0 6px 24px rgba(0,0,0,.4); color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;-webkit-user-select:none;user-select:none}
+#app{position:fixed;inset:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px) 0}
+canvas#c{display:block;width:100%;height:100%;touch-action:none;cursor:grab;outline:none}
+canvas#c:active{cursor:grabbing}
+.panel{background:var(--surface);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow)}
+button{font:inherit;color:inherit}
+button:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+
+/* top-left: brand + current zone */
+#brand{position:absolute;left:16px;top:16px;padding:10px 14px;display:flex;align-items:center;gap:12px;max-width:calc(100% - 32px)}
+.flag{display:flex;flex-direction:column;gap:3px}.flag i{width:18px;height:5px;border-radius:2px;display:block}
+.flag .g{background:var(--green)}.flag .a{background:var(--amber)}.flag .c{background:var(--clay)}
+#brand h1{font-family:var(--f-disp);font-size:17px;font-weight:700;margin:0;letter-spacing:-.01em;line-height:1.1}
+#here{font-size:13px;color:var(--ink-3);margin-top:2px}
+#here b{color:var(--ink);font-weight:600}
+
+/* minimap */
+#mapbox{position:absolute;right:16px;top:16px;padding:8px;width:min(300px,42vw)}
+#map{display:block;width:100%;height:auto;border-radius:7px;cursor:pointer}
+#mapbox .cap{display:flex;justify-content:space-between;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);padding:2px 2px 6px}
+
+/* zone jump bar */
+#jump{position:absolute;left:50%;transform:translateX(-50%);bottom:16px;display:flex;gap:6px;padding:6px;flex-wrap:wrap;justify-content:center;max-width:calc(100% - 32px)}
+#jump button{border:0;background:transparent;padding:7px 12px;border-radius:8px;font-weight:600;font-size:14px;display:flex;align-items:center;gap:7px;cursor:pointer;color:var(--ink-2)}
+#jump button:hover{background:var(--line);color:var(--ink)}
+#jump button.on{background:var(--ink);color:var(--surface-solid)}
+#jump .dot{width:9px;height:9px;border-radius:50%}
+
+/* key help */
+#help{position:absolute;left:16px;bottom:16px;padding:10px 12px;font-size:13px;color:var(--ink-2);display:grid;grid-template-columns:auto auto;gap:4px 10px;align-items:center}
+kbd{font-family:var(--f-body);font-size:12px;font-weight:600;border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:1px 6px;background:var(--surface-solid);color:var(--ink)}
+
+/* hotspots */
+#hot{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.hs{position:absolute;left:0;top:0;pointer-events:auto;display:flex;align-items:center;gap:8px;border:0;background:none;padding:0;cursor:pointer;transform-origin:22px 50%}
+.hs .i{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;color:#fff;font-family:Georgia,serif;font-style:italic;font-weight:700;font-size:21px;box-shadow:0 0 0 4px rgba(255,255,255,.75),0 4px 14px rgba(0,0,0,.25);position:relative}
+.hs .i::after{content:"";position:absolute;inset:-4px;border-radius:50%;border:2px solid rgba(255,255,255,.9);animation:pulse 2.2s ease-out infinite}
+@keyframes pulse{0%{transform:scale(1);opacity:.9}100%{transform:scale(1.7);opacity:0}}
+.hs .t{background:var(--surface-solid);color:var(--ink);font-weight:600;font-size:14px;padding:5px 10px;border-radius:7px;box-shadow:var(--shadow);white-space:nowrap}
+.hs:hover .i{filter:brightness(1.1)}
+
+/* info card */
+#card{position:absolute;z-index:2000;right:16px;bottom:16px;width:min(380px,calc(100% - 32px));padding:20px 20px 18px;max-height:calc(100% - 32px);overflow:auto}
+#card .eyebrow{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);display:flex;align-items:center;gap:8px}
+#card .eyebrow .dot{width:10px;height:10px;border-radius:50%}
+#card h2{font-family:var(--f-disp);font-size:28px;line-height:1.05;margin:6px 0 4px;letter-spacing:-.015em;text-wrap:balance}
+#card .lead{color:var(--ink-2);margin:0 0 14px;font-size:15px;line-height:1.45}
+#card h3{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);margin:14px 0 6px;font-weight:600}
+#card ul{margin:0;padding-left:18px;line-height:1.5;color:var(--ink)}
+#card li{margin:2px 0}
+.cap-row{display:flex;align-items:baseline;gap:8px;margin-bottom:4px}
+.cap-row .num{font-family:var(--f-disp);font-size:34px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1}
+.cap-row .unit{color:var(--ink-2)}
+#card .x{position:absolute;right:10px;top:10px;width:34px;height:34px;border-radius:8px;border:0;background:transparent;font-size:22px;line-height:1;cursor:pointer;color:var(--ink-2)}
+#card .x:hover{background:var(--line)}
+
+/* start / loading overlay */
+#intro{position:absolute;inset:0;z-index:5000;display:grid;place-items:center;background:color-mix(in srgb,var(--bg) 70%,transparent);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);padding:16px}
+#intro .box{max-width:460px;padding:28px 26px;text-align:left}
+#intro h2{font-family:var(--f-disp);font-size:34px;line-height:1.02;margin:10px 0 10px;letter-spacing:-.02em}
+#intro p{color:var(--ink-2);line-height:1.5;margin:0 0 16px}
+#intro ul{margin:0 0 20px;padding:0;list-style:none;display:grid;gap:8px;color:var(--ink-2)}
+#intro li{display:flex;gap:10px;align-items:center}
+#go{border:0;background:var(--green);color:#fff;font-weight:600;font-size:16px;padding:12px 20px;border-radius:10px;cursor:pointer;width:100%}
+#go:disabled{opacity:.55;cursor:progress}
+#bar{height:4px;background:var(--line);border-radius:3px;overflow:hidden;margin:0 0 16px}
+#bar i{display:block;height:100%;width:0;background:var(--green);transition:width .3s}
+
+/* touch joystick */
+#joy{position:absolute;left:24px;bottom:96px;width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,.28);border:2px solid rgba(255,255,255,.6);touch-action:none;display:none}
+#joy i{position:absolute;left:50%;top:50%;width:52px;height:52px;margin:-26px 0 0 -26px;border-radius:50%;background:rgba(255,255,255,.85);box-shadow:var(--shadow)}
+.touch #joy{display:block}
+.touch #help{display:none}
+#intro .only-touch{display:none}.touch #intro .only-touch{display:grid}.touch #intro .only-desk{display:none}
+
+@media (max-width:700px){
+  #brand{padding:8px 10px}
+  #brand h1{font-size:15px}
+  #mapbox{width:min(190px,46vw);top:auto;bottom:84px;right:12px;padding:6px}
+  #mapbox .cap{display:none}
+  #jump{bottom:10px;gap:2px;padding:4px;left:12px;right:12px;transform:none;max-width:none;flex-wrap:nowrap;overflow-x:auto;justify-content:flex-start;scrollbar-width:none}
+  #jump button{flex:0 0 auto}
+  #jump button{padding:6px 8px;font-size:12.5px}
+  #card{left:12px;right:12px;width:auto;bottom:10px;max-height:60%}
+  #joy{left:16px;bottom:90px;width:110px;height:110px}
+  .hs .t{display:none}
+}
+@media (prefers-reduced-motion:reduce){.hs .i::after{animation:none}}
+</style>
+
+<div id="app">
+  <canvas id="c" tabindex="0" aria-label="3D-rondleiding door Leerplek Breda"></canvas>
+  <div id="hot"></div>
+
+  <div id="brand" class="panel">
+    <div class="flag" aria-hidden="true"><i class="g"></i><i class="a"></i><i class="c"></i></div>
+    <div><h1>Leerplek Breda</h1><div id="here">Je staat bij de <b>entree</b></div></div>
+  </div>
+
+  <div id="mapbox" class="panel">
+    <div class="cap"><span>Plattegrond</span><span>tik om te gaan</span></div>
+    <canvas id="map" width="600" height="302" aria-label="Plattegrond, klik op een zone om erheen te gaan"></canvas>
+  </div>
+
+  <div id="help" class="panel" aria-label="Besturing">
+    <span><kbd>↑</kbd> <kbd>↓</kbd></span><span>lopen</span>
+    <span><kbd>←</kbd> <kbd>→</kbd></span><span>draaien</span>
+    <span><kbd>A</kbd> <kbd>D</kbd></span><span>zijwaarts</span>
+    <span><kbd>Shift</kbd></span><span>sneller</span>
+    <span><kbd>slepen</kbd></span><span>rondkijken</span>
+  </div>
+
+  <div id="jump" class="panel" role="toolbar" aria-label="Ga naar zone"></div>
+  <div id="joy" aria-hidden="true"><i></i></div>
+
+  <aside id="card" class="panel" hidden aria-live="polite">
+    <button class="x" id="cx" aria-label="Sluiten">×</button>
+    <div class="eyebrow"><span class="dot" id="cdot"></span><span id="ctag">Zone</span></div>
+    <h2 id="ctitle"></h2>
+    <p class="lead" id="clead"></p>
+    <h3>Doel en activiteiten</h3>
+    <ul id="cdo"></ul>
+    <h3>Capaciteit en inrichting</h3>
+    <div class="cap-row"><span class="num" id="cnum"></span><span class="unit" id="cunit"></span></div>
+    <ul id="cin"></ul>
+  </aside>
+
+  <div id="intro">
+    <div class="box panel">
+      <div class="eyebrow" style="font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)">Gemeente Breda · Learning &amp; Development</div>
+      <h2>Loop door de Leerplek</h2>
+      <p>Verken de leeromgeving alsof je er zelf staat. Klik op een <b>i</b> boven een zone voor uitleg.</p>
+      <ul class="only-desk">
+        <li><kbd>↑</kbd><kbd>↓</kbd> lopen &nbsp; <kbd>←</kbd><kbd>→</kbd> draaien</li>
+        <li><kbd>W A S D</kbd> werkt ook · sleep met de muis om rond te kijken</li>
+      </ul>
+      <ul class="only-touch">
+        <li>Linksonder: joystick om te lopen</li>
+        <li>Sleep over het scherm om rond te kijken</li>
+      </ul>
+      <div id="bar"><i></i></div>
+      <button id="go" disabled>Model laden…</button>
+    </div>
+  </div>
+</div>
+
+
+<script type="importmap">
+{"imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+const isTouch = matchMedia('(pointer:coarse)').matches;
+if (isTouch) document.body.classList.add('touch');
+const $ = id => document.getElementById(id);
+
+/* Blender (x,y,z) -> three (x, z, -y) */
+const B = (x, y, z = 0) => new THREE.Vector3(x, z, -y);
+
+const ZONES = [
+  { id:'werf', name:'De Werf', color:'--amber', tag:'Hands-on werkplaats',
+    rect:[0.4,0.6,11.2,7.7], hot:[5.7,4.2,2.6], view:[[5.7,0.9],[5.7,5.5]],
+    lead:'De werkplaats van de Leerplek. Hier ga je zelf aan de slag.',
+    doel:['Zelfstandig leren met e-learning en online modules','Oefenen met nieuwe tools en systemen','Samen opdrachten uitwerken aan de whiteboards'],
+    num:'24', unit:'werkplekken',
+    in:['12 bureaus in duo-opstelling','Per plek een monitor, laptop en bureaustoel','3 verrijdbare whiteboards'] },
+  { id:'turf', name:'Het Turfschip', color:'--green', tag:'Brainstorm & workshops',
+    rect:[0.75,8.0,13.0,16.1], hot:[6.2,12.0,2.75], view:[[6.4,8.7],[6.2,13.2]],
+    lead:'De afsluitbare brainstormruimte voor workshops en hybride sessies.',
+    doel:['Brainstormen en mindmappen op slimme digitale tafels','Workshops en trainingen geven','Hybride sessies streamen voor collega’s op afstand'],
+    num:'18', unit:'plekken',
+    in:['3 slimme digitale tafels met ligstoelen','Groot vrijstaand scherm en streamingcamera','Akoestische kastwand, verspringende ingang met gordijn'] },
+  { id:'haven', name:'De Haven', color:'--water', tag:'Community lounge',
+    rect:[13.0,8.0,25.5,16.1], hot:[19.6,12.2,2.75], view:[[21.2,9.8],[20.2,14.2]],
+    lead:'De huiskamer van de Leerplek, voor het goede gesprek bij een kop koffie.',
+    doel:['Informeel leren en kennis delen','Het goede gesprek tussen collega’s en leidinggevenden','Even bijkomen en elkaar ontmoeten'],
+    num:'±15', unit:'plekken',
+    in:['Banken en loungestoelen op een vloerkleed','Koffiebar met krukken en hoge tafels','Open boekenkasten met planten als afscheiding'] },
+  { id:'toren', name:'De Toren', color:'--clay', tag:'Receptie & helpdesk',
+    rect:[13.6,0.2,25.0,7.0], hot:[19.5,3.3,2.7], view:[[19.5,0.8],[19.5,4.0]],
+    lead:'Het startpunt: hier word je ontvangen en geholpen met je leervraag.',
+    doel:['Ontvangst van bezoekers','L&D-helpdesk: vragen en advies over leerdoelen','Aanmelden voor trainingen en sessies'],
+    num:'2', unit:'hostplekken',
+    in:['Receptiebalie in het midden','Aan beide kanten een loungebank om te wachten','Zonebordjes wijzen de weg'] },
+  { id:'sluis', name:'De Sluis', color:'--plum', tag:'Stilte & focus',
+    rect:[26.6,1.6,30.2,14.4], hot:[28.4,8.0,3.1], view:[[25.9,5.2],[28.4,8.0]],
+    lead:'Glazen cabines voor als je even ongestoord wilt werken of praten.',
+    doel:['1-op-1 gesprekken en coaching','Videocalls en online trainingen','Geconcentreerd werken'],
+    num:'3', unit:'cabines voor 2–4 personen',
+    in:['Glazen wanden met akoestisch plafond','Tafel met zitplekken per cabine'] },
+];
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+/* ---------- renderer / scene ---------- */
+const canvas = $('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio, isTouch ? 1.5 : 1.75));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.9;
+renderer.shadowMap.enabled = !isTouch && !window.__lite;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+const SKY = new THREE.Color('#DDE4DE');
+scene.background = SKY;
+scene.fog = new THREE.Fog(SKY, 26, 60);
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(renderer), 0.04).texture;
+
+const camera = new THREE.PerspectiveCamera(68, 1, 0.05, 200);
+camera.rotation.order = 'YXZ';
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0xB3A68F, 0.55));
+const sun = new THREE.DirectionalLight(0xfff3e2, 2.1);
+sun.position.copy(B(22, -6, 14));
+sun.target.position.copy(B(15.5, 8, 0));
+sun.castShadow = true;
+sun.shadow.mapSize.set(4096, 4096);
+Object.assign(sun.shadow.camera, { left: -22, right: 22, top: 14, bottom: -14, near: 1, far: 50 });
+sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.03;
+scene.add(sun, sun.target);
+
+/* ceiling (only seen from below) */
+const ceil = new THREE.Mesh(new THREE.PlaneGeometry(36, 20), new THREE.MeshStandardMaterial({ color: 0xF2F1EC, roughness: 0.95 }));
+ceil.rotation.x = Math.PI / 2; ceil.position.copy(B(15.5, 8, 3.6));
+scene.add(ceil);
+/* light panels in the ceiling */
+const lp = new THREE.MeshBasicMaterial({ color: 0xffffff });
+for (let x = 2; x < 31; x += 4) for (let y = 1.5; y < 16; y += 3.5) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.3), lp);
+  m.rotation.x = Math.PI / 2; m.position.copy(B(x, y, 3.59)); scene.add(m);
+}
+
+/* ---------- load model ---------- */
+const boxes = []; // 2D collision boxes in three xz
+let floorRect = { x0: -0.9, x1: 31.9, y0: -0.2, y1: 16.2 };
+function b64ToBuf(s) {
+  const bin = atob(s.replace(/\s+/g, '')); const n = bin.length; const u = new Uint8Array(n);
+  for (let i = 0; i < n; i++) u[i] = bin.charCodeAt(i);
+  return u.buffer;
+}
+const goBtn = $('go'), bar = $('bar').firstElementChild;
+bar.style.width = '25%';
+setTimeout(async () => {
+  let buf;
+  try { buf = await (await fetch('model.glb')).arrayBuffer(); } catch (e) { goBtn.textContent = 'Model kon niet laden'; return; }
+  bar.style.width = '60%';
+  // The page's sandbox blocks fetch() of blob: URLs, which GLTFLoader's ImageBitmapLoader uses.
+  // Hide createImageBitmap so the loader falls back to <img>-based TextureLoader.
+  const _cib = window.createImageBitmap; try { window.createImageBitmap = undefined; } catch (e) {}
+  const loader = new GLTFLoader(); loader.setMeshoptDecoder(MeshoptDecoder);
+  loader.parse(buf, '', gltf => {
+    const root = gltf.scene; scene.add(root);
+    root.updateMatrixWorld(true);
+    const bb = new THREE.Box3();
+    root.traverse(o => {
+      if (!o.isMesh) return;
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      let glass = false;
+      for (const m of mats) {
+        const n = (m.name || '').toLowerCase();
+        if (n.includes('glass') || n.includes('glas') || (m.transmission && m.transmission > 0.2)) {
+          glass = true; m.transparent = true; m.opacity = 0.22; m.transmission = 0; m.roughness = 0.05; m.depthWrite = false; m.envMapIntensity = 1.4;
+        }
+        if (m.map) m.map.anisotropy = 4;
+        if (!glass) m.envMapIntensity = 0.5;
+      }
+      o.castShadow = !glass; o.receiveShadow = true;
+      if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+      const mats4 = [];
+      if (o.isInstancedMesh) {
+        const im = new THREE.Matrix4();
+        for (let i = 0; i < o.count; i++) { o.getMatrixAt(i, im); mats4.push(new THREE.Matrix4().multiplyMatrices(o.matrixWorld, im)); }
+      } else mats4.push(o.matrixWorld);
+      for (const M of mats4) {
+        bb.copy(o.geometry.boundingBox).applyMatrix4(M);
+        const h0 = bb.min.y, h1 = bb.max.y, sx = bb.max.x - bb.min.x, sz = bb.max.z - bb.min.z;
+        if (h1 > 0.3 && h0 < 1.4 && sx * sz < 30 && Math.max(sx, sz) < 13) {
+          boxes.push({ x0: bb.min.x, x1: bb.max.x, z0: bb.min.z, z1: bb.max.z });
+        }
+      }
+    });
+    bar.style.width = '100%';
+    goBtn.disabled = false; goBtn.textContent = 'Start de rondleiding';
+    drawMapBase();
+  }, err => { console.error(err); goBtn.textContent = 'Model kon niet laden'; });
+  try { window.createImageBitmap = _cib; } catch (e) {}
+}, 30);
+
+/* ---------- player ---------- */
+const EYE = 1.62, R = 0.24;
+const player = { pos: B(13.0, 0.5, EYE), yaw: 0, pitch: -0.04 };
+function blocked(x, z) {
+  const bx = x, by = -z;
+  if (bx < floorRect.x0 || bx > floorRect.x1 || by < floorRect.y0 || by > floorRect.y1) return true;
+  for (const b of boxes) if (x > b.x0 - R && x < b.x1 + R && z > b.z0 - R && z < b.z1 + R) return true;
+  return false;
+}
+function tryMove(dx, dz) {
+  const p = player.pos; const inside = blocked(p.x, p.z);
+  if (inside) { p.x += dx; p.z += dz; return; } // stuck: let them walk out
+  if (!blocked(p.x + dx, p.z)) p.x += dx;
+  if (!blocked(p.x, p.z + dz)) p.z += dz;
+}
+
+/* keyboard */
+const keys = new Set();
+addEventListener('keydown', e => {
+  if (e.target.closest && e.target.closest('button') && (e.key === ' ' || e.key === 'Enter')) return;
+  if (e.key === 'Escape') { closeCard(); return; }
+  const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','w','a','s','d','q','e','Shift'].includes(k)) { keys.add(k); e.preventDefault(); glide = null; }
+});
+addEventListener('keyup', e => keys.delete(e.key.length === 1 ? e.key.toLowerCase() : e.key));
+addEventListener('blur', () => keys.clear());
+
+/* drag to look */
+let drag = null;
+canvas.addEventListener('pointerdown', e => { drag = { id: e.pointerId, x: e.clientX, y: e.clientY }; canvas.setPointerCapture(e.pointerId); canvas.focus(); });
+canvas.addEventListener('pointermove', e => {
+  if (!drag || drag.id !== e.pointerId) return;
+  const k = isTouch ? 0.0045 : 0.0032;
+  player.yaw += (e.clientX - drag.x) * k; player.pitch += (e.clientY - drag.y) * k;
+  player.pitch = Math.max(-1.2, Math.min(1.0, player.pitch));
+  drag.x = e.clientX; drag.y = e.clientY; glide = null;
+});
+const endDrag = e => { if (drag && drag.id === e.pointerId) drag = null; };
+canvas.addEventListener('pointerup', endDrag); canvas.addEventListener('pointercancel', endDrag);
+
+/* joystick */
+const joy = $('joy'), knob = joy.firstElementChild; let jv = { x: 0, y: 0 }, jid = null;
+function joyMove(e) {
+  const r = joy.getBoundingClientRect(); const cx = r.left + r.width / 2, cy = r.top + r.height / 2, max = r.width / 2 - 10;
+  let dx = e.clientX - cx, dy = e.clientY - cy; const d = Math.hypot(dx, dy); if (d > max) { dx *= max / d; dy *= max / d; }
+  knob.style.transform = `translate(${dx}px,${dy}px)`; jv = { x: dx / max, y: dy / max }; glide = null;
+}
+joy.addEventListener('pointerdown', e => { jid = e.pointerId; joy.setPointerCapture(jid); joyMove(e); e.stopPropagation(); });
+joy.addEventListener('pointermove', e => { if (e.pointerId === jid) joyMove(e); });
+const joyEnd = e => { if (e.pointerId === jid) { jid = null; jv = { x: 0, y: 0 }; knob.style.transform = ''; } };
+joy.addEventListener('pointerup', joyEnd); joy.addEventListener('pointercancel', joyEnd);
+
+/* glide (teleport animation) */
+let glide = null;
+function yawTo(fromB, toB) { const dx = toB[0] - fromB[0], dy = toB[1] - fromB[1]; return Math.atan2(-dx, dy); }
+function goToZone(z) {
+  const [p, t] = z.view;
+  let ty = yawTo(p, t);
+  let dy = ty - player.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+  glide = { t: 0, dur: 1.4, from: player.pos.clone(), to: B(p[0], p[1], EYE), y0: player.yaw, y1: player.yaw + dy, p0: player.pitch, p1: -0.06 };
+}
+function faceZone(z) {
+  const fb = [player.pos.x, -player.pos.z]; const ty = yawTo(fb, z.hot);
+  let dy = ty - player.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+  glide = { t: 0, dur: 0.8, from: player.pos.clone(), to: player.pos.clone(), y0: player.yaw, y1: player.yaw + dy, p0: player.pitch, p1: 0.05 };
+}
+window.__jump = i => { const z = ZONES[i]; glide = null; player.pos.copy(B(z.view[0][0], z.view[0][1], EYE)); player.yaw = yawTo(z.view[0], z.view[1]); player.pitch = -0.08; };
+const ease = t => t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+
+/* ---------- UI: hotspots, jump bar, card ---------- */
+const hotLayer = $('hot');
+for (const z of ZONES) {
+  z.col = css(z.color); z.p3 = B(...z.hot);
+  const b = document.createElement('button'); b.className = 'hs'; b.setAttribute('aria-label', `Info over ${z.name}`);
+  b.innerHTML = `<span class="i" style="background:${z.col}">i</span><span class="t">${z.name}</span>`;
+  b.addEventListener('click', e => { e.stopPropagation(); openCard(z); faceZone(z); });
+  hotLayer.appendChild(b); z.el = b;
+  const j = document.createElement('button'); j.innerHTML = `<span class="dot" style="background:${z.col}"></span>${z.name}`;
+  j.addEventListener('click', () => { goToZone(z); openCard(z); }); $('jump').appendChild(j); z.jb = j;
+}
+let openZone = null;
+function openCard(z) {
+  openZone = z;
+  $('cdot').style.background = z.col; $('ctag').textContent = z.tag; $('ctitle').textContent = z.name; $('clead').textContent = z.lead;
+  $('cdo').innerHTML = z.doel.map(s => `<li>${s}</li>`).join('');
+  $('cnum').textContent = z.num; $('cnum').style.color = z.col; $('cunit').textContent = z.unit;
+  $('cin').innerHTML = z.in.map(s => `<li>${s}</li>`).join('');
+  $('card').hidden = false;
+}
+function closeCard() { $('card').hidden = true; openZone = null; }
+$('cx').addEventListener('click', closeCard);
+$('go').addEventListener('click', () => { $('intro').hidden = true; canvas.focus(); });
+
+/* ---------- minimap ---------- */
+const map = $('map'), mctx = map.getContext('2d');
+const MX0 = -1, MX1 = 32, MY0 = -0.3, MY1 = 16.3;
+const mx = x => (x - MX0) / (MX1 - MX0) * map.width, my = y => (1 - (y - MY0) / (MY1 - MY0)) * map.height;
+let mapBase = null;
+function drawMapBase() {
+  const c = document.createElement('canvas'); c.width = map.width; c.height = map.height; const g = c.getContext('2d');
+  g.fillStyle = css('--surface-solid'); g.fillRect(0, 0, c.width, c.height);
+  for (const z of ZONES) {
+    const [x0, y0, x1, y1] = z.rect; g.fillStyle = z.col; g.globalAlpha = 0.2;
+    g.fillRect(mx(x0), my(y1), mx(x1) - mx(x0), my(y0) - my(y1)); g.globalAlpha = 1;
+  }
+  g.fillStyle = css('--ink-3'); g.globalAlpha = 0.55;
+  for (const b of boxes) g.fillRect(mx(b.x0), my(-b.z0), Math.max(1, mx(b.x1) - mx(b.x0)), Math.max(1, my(-b.z1) - my(-b.z0)));
+  g.globalAlpha = 1;
+  g.font = '600 19px "Source Sans 3",sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  for (const z of ZONES) {
+    const [x0, y0, x1, y1] = z.rect; const cx = mx((x0 + x1) / 2), cy = my((y0 + y1) / 2);
+    g.fillStyle = css('--surface-solid'); g.globalAlpha = .8; const w = g.measureText(z.name).width + 12; g.fillRect(cx - w / 2, cy - 12, w, 24); g.globalAlpha = 1;
+    g.fillStyle = z.col; g.fillText(z.name, cx, cy + 1);
+  }
+  g.fillStyle = css('--ink-2'); g.font = '600 15px "Source Sans 3",sans-serif'; g.fillText('ENTREE ▲', mx(13), my(-0.3) - 12);
+  mapBase = c;
+}
+function drawMap() {
+  if (!mapBase) return;
+  mctx.drawImage(mapBase, 0, 0);
+  const x = mx(player.pos.x), y = my(-player.pos.z);
+  const a = player.yaw; // forward in map: (-sin a, -cos a) in canvas (north = up)
+  const fx = -Math.sin(a), fy = -Math.cos(a);
+  mctx.fillStyle = css('--clay'); mctx.globalAlpha = 0.25; mctx.beginPath(); mctx.moveTo(x, y);
+  const s = 0.6, L = 60;
+  mctx.lineTo(x + L * (fx * Math.cos(s) - fy * Math.sin(s)), y + L * (fx * Math.sin(s) + fy * Math.cos(s)));
+  mctx.lineTo(x + L * (fx * Math.cos(-s) - fy * Math.sin(-s)), y + L * (fx * Math.sin(-s) + fy * Math.cos(-s)));
+  mctx.closePath(); mctx.fill(); mctx.globalAlpha = 1;
+  mctx.beginPath(); mctx.arc(x, y, 8, 0, 7); mctx.fillStyle = css('--clay'); mctx.fill(); mctx.lineWidth = 3; mctx.strokeStyle = '#fff'; mctx.stroke();
+}
+map.addEventListener('click', e => {
+  const r = map.getBoundingClientRect(); const px = (e.clientX - r.left) / r.width * map.width, py = (e.clientY - r.top) / r.height * map.height;
+  const bx = MX0 + px / map.width * (MX1 - MX0), by = MY0 + (1 - py / map.height) * (MY1 - MY0);
+  const z = ZONES.find(z => bx >= z.rect[0] && bx <= z.rect[2] && by >= z.rect[1] && by <= z.rect[3]);
+  if (z) { goToZone(z); openCard(z); }
+});
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { for (const z of ZONES) z.col = css(z.color); drawMapBase(); });
+
+/* ---------- loop ---------- */
+function resize() {
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+}
+addEventListener('resize', resize); resize();
+
+let last = performance.now(), curZone = undefined;
+const v = new THREE.Vector3();
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (glide) {
+    glide.t += dt / glide.dur; const k = ease(Math.min(1, glide.t));
+    player.pos.lerpVectors(glide.from, glide.to, k);
+    player.yaw = glide.y0 + (glide.y1 - glide.y0) * k; player.pitch = glide.p0 + (glide.p1 - glide.p0) * k;
+    if (glide.t >= 1) glide = null;
+  } else {
+    const run = keys.has('Shift') ? 2.0 : 1.0; const sp = 1.7 * run * dt;
+    let f = 0, st = 0;
+    if (keys.has('ArrowUp') || keys.has('w')) f += 1;
+    if (keys.has('ArrowDown') || keys.has('s')) f -= 1;
+    if (keys.has('a') || keys.has('q')) st -= 1;
+    if (keys.has('d') || keys.has('e')) st += 1;
+    if (keys.has('ArrowLeft')) player.yaw += 1.7 * dt;
+    if (keys.has('ArrowRight')) player.yaw -= 1.7 * dt;
+    if (jv.x || jv.y) { f += -jv.y; player.yaw -= jv.x * 1.6 * dt; }
+    if (f || st) {
+      const sy = Math.sin(player.yaw), cy = Math.cos(player.yaw);
+      const dx = (-sy * f + cy * st) * sp, dz = (-cy * f - sy * st) * sp;
+      tryMove(dx, dz);
+    }
+  }
+  camera.position.copy(player.pos);
+  camera.rotation.set(player.pitch, player.yaw, 0);
+  // the drag sign: dragging right should look right
+  renderer.render(scene, camera);
+
+  // hotspots
+  const W = canvas.clientWidth, H = canvas.clientHeight;
+  for (const z of ZONES) {
+    v.copy(z.p3).project(camera);
+    const dist = camera.position.distanceTo(z.p3);
+    const vis = v.z < 1 && Math.abs(v.x) < 1.15 && Math.abs(v.y) < 1.15 && dist > 1.2;
+    if (!vis) { z.el.style.display = 'none'; continue; }
+    z.el.style.display = 'flex';
+    const sc = Math.max(0.62, Math.min(1.1, 7 / dist));
+    z.el.style.transform = `translate(${(v.x + 1) / 2 * W - 20}px,${(1 - v.y) / 2 * H - 20}px) scale(${sc})`;
+    z.el.style.zIndex = String(1000 - Math.round(dist * 10));
+  }
+  // where am I
+  const bx = player.pos.x, by = -player.pos.z;
+  const zn = ZONES.find(z => bx >= z.rect[0] && bx <= z.rect[2] && by >= z.rect[1] && by <= z.rect[3]) || null;
+  if (zn !== curZone) {
+    curZone = zn;
+    $('here').innerHTML = zn ? `Je bent in <b style="color:${zn.col}">${zn.name}</b>` : (by < 1.2 ? 'Je staat bij de <b>entree</b>' : 'Je loopt over het <b>middenpad</b>');
+    for (const z of ZONES) z.jb.classList.toggle('on', z === zn);
+  }
+  drawMap();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+
+</body></html>
